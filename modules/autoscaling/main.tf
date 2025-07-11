@@ -40,7 +40,7 @@ resource "aws_launch_template" "web" {
       res.end('Hello from Node.js on Terraform!\n');
     });
     server.listen(port, () => {
-      console.log(`Server running at http://localhost:${port}/`);
+      console.log('Server running at http://localhost:' + port + '/'); // Fixed syntax
     });
     NODEAPP
     cd /home/ec2-user/app
