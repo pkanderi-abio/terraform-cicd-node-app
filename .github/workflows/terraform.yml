@@ -33,14 +33,37 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
+      - name: Set environment variables for Terraform
+        id: set_env_vars
+        run: |
+          if [[ "${GITHUB_REF##*/}" == "dev" ]]; then
+            echo "MY_IP=${{ secrets.TF_VAR_my_ip_dev }}" >> $GITHUB_ENV
+            echo "DB_NAME=${{ secrets.TF_VAR_db_name_dev }}" >> $GITHUB_ENV
+            echo "DB_USERNAME=${{ secrets.TF_VAR_db_username_dev }}" >> $GITHUB_ENV
+            echo "DB_PASSWORD=${{ secrets.TF_VAR_db_password_dev }}" >> $GITHUB_ENV
+            echo "VPC_CIDR=${{ secrets.TF_VAR_vpc_cidr_dev }}" >> $GITHUB_ENV
+            echo "SUBNET_CIDRS=${{ secrets.TF_VAR_subnet_cidrs_dev }}" >> $GITHUB_ENV
+            echo "AVAILABILITY_ZONES=${{ secrets.TF_VAR_availability_zones_dev }}" >> $GITHUB_ENV
+            echo "INSTANCE_TYPE=${{ secrets.TF_VAR_instance_type_dev }}" >> $GITHUB_ENV
+          else
+            echo "MY_IP=${{ secrets.TF_VAR_my_ip_default }}" >> $GITHUB_ENV
+            echo "DB_NAME=${{ secrets.TF_VAR_db_name_default }}" >> $GITHUB_ENV
+            echo "DB_USERNAME=${{ secrets.TF_VAR_db_username_default }}" >> $GITHUB_ENV
+            echo "DB_PASSWORD=${{ secrets.TF_VAR_db_password_default }}" >> $GITHUB_ENV
+            echo "VPC_CIDR=${{ secrets.TF_VAR_vpc_cidr_default }}" >> $GITHUB_ENV
+            echo "SUBNET_CIDRS=${{ secrets.TF_VAR_subnet_cidrs_default }}" >> $GITHUB_ENV
+            echo "AVAILABILITY_ZONES=${{ secrets.TF_VAR_availability_zones_default }}" >> $GITHUB_ENV
+            echo "INSTANCE_TYPE=${{ secrets.TF_VAR_instance_type_default }}" >> $GITHUB_ENV
+          fi
+
       - name: Terraform Plan
-        run: terraform plan -var "environment=${{ env.TF_WORKSPACE }}" -var "public_key_source=env" -var "my_ip=${{ secrets[format('TF_VAR_my_ip_{0}', env.TF_WORKSPACE)] }}" -var "db_name=${{ secrets[format('TF_VAR_db_name_{0}', env.TF_WORKSPACE)] }}" -var "db_username=${{ secrets[format('TF_VAR_db_username_{0}', env.TF_WORKSPACE)] }}" -var "db_password=${{ secrets[format('TF_VAR_db_password_{0}', env.TF_WORKSPACE)] }}" -var "vpc_cidr=${{ secrets[format('TF_VAR_vpc_cidr_{0}', env.TF_WORKSPACE)] }}" -var "subnet_cidrs=${{ secrets[format('TF_VAR_subnet_cidrs_{0}', env.TF_WORKSPACE)] }}" -var "availability_zones=${{ secrets[format('TF_VAR_availability_zones_{0}', env.TF_WORKSPACE)] }}" -var "instance_type=${{ secrets[format('TF_VAR_instance_type_{0}', env.TF_WORKSPACE)] }}" -out=tfplan
+        run: terraform plan -var "environment=${{ env.TF_WORKSPACE }}" -var "public_key_source=env" -var "my_ip=${{ env.MY_IP }}" -var "db_name=${{ env.DB_NAME }}" -var "db_username=${{ env.DB_USERNAME }}" -var "db_password=${{ env.DB_PASSWORD }}" -var "vpc_cidr=${{ env.VPC_CIDR }}" -var "subnet_cidrs=${{ env.SUBNET_CIDRS }}" -var "availability_zones=${{ env.AVAILABILITY_ZONES }}" -var "instance_type=${{ env.INSTANCE_TYPE }}" -out=tfplan
         env:
           SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
         env:
-          TF_VAR_my_ip: ${{ secrets[format('TF_VAR_my_ip_{0}', env.TF_WORKSPACE)] }}
-          TF_VAR_db_password: ${{ secrets[format('TF_VAR_db_password_{0}', env.TF_WORKSPACE)] }}
+          TF_VAR_my_ip: ${{ env.MY_IP }}
+          TF_VAR_db_password: ${{ env.DB_PASSWORD }}
           SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
