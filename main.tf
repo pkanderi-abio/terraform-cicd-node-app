@@ -111,15 +111,10 @@ variable "public_key_path" {
   default     = "./my-key-pair.pub"  # Local file path
 }
 
-# Use a local or environment-based public key
-locals {
-  public_key = var.public_key_source == "local" ? file(var.public_key_path) : (var.public_key_source == "env" ? env("SSH_PUBLIC_KEY") : "")
-}
-
 # Key pair resource using the local value
 resource "aws_key_pair" "my_key" {
   key_name   = "my-key-pair"
-  public_key = local.public_key
+  public_key = file(var.public_key_path)
 }
 
 # Create Security Group
