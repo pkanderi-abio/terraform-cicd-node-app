@@ -12,8 +12,20 @@ terraform {
 }
 
 # Define Variables
+variable "public_key_source" {
+  description = "Source of the public key (local or env)"
+  type        = string
+  default     = "local"
+}
+
+variable "public_key_path" {
+  description = "Path to the local public key file"
+  type        = string
+  default     = "my-key-pair.pub"
+}
+
 variable "environment" {
-  description = "Environment (default for prod, dev for development)"
+  description = "Environment (e.g., default for Prod)"
   type        = string
   default     = "default"
 }
@@ -62,7 +74,18 @@ variable "availability_zones" {
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
-  default     = "t3.medium"
+  default     = "t2.micro"
+}
+
+locals {
+  public_key = var.public_key_source == "local" ? file(var.public_key_path) : (var.public_key_source == "env" ? var.ssh_public_key : "")
+}
+
+# Add this variable to accept the SSH public key from the environment
+variable "ssh_public_key" {
+  description = "SSH public key when source is env"
+  type        = string
+  default     = ""
 }
 
 # Generate a random string for unique S3 bucket names
