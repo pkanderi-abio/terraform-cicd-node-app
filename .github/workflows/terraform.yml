@@ -33,12 +33,6 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
-      - name: Load Environment Variables
-        uses: xom9ik/dotenv@v2
-        with:
-          path: ./.env.github
-          mode: replace
-
       - name: Terraform Plan
         run: terraform plan -var "environment=${{ env.TF_WORKSPACE }}" -var "public_key_source=env" -var "ssh_public_key=${{ env.SSH_PUBLIC_KEY }}" -out=tfplan
         env:
