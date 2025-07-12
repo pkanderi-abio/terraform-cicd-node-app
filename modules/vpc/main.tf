@@ -24,6 +24,7 @@ resource "aws_subnet" "subnets" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = var.subnet_cidrs[count.index]
   availability_zone = var.availability_zones[count.index]
+  map_public_ip_on_launch = true # Ensure public IPs for all instances
   tags = {
     Name = "Subnet-${count.index + 1}"
   }

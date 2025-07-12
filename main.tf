@@ -77,11 +77,17 @@ module "vpc" {
 # Create Security Group
 resource "aws_security_group" "allow_ssh_http_mysql" {
   vpc_id = module.vpc.vpc_id
+ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.my_ip] # External access
+  }
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [var.my_ip]
+    cidr_blocks = [var.vpc_cidr] # Internal access
   }
   ingress {
     from_port   = 80
