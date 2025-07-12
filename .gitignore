@@ -2,4 +2,4 @@
 # Terraform variables for the VPC module
 .terraform*
 terraform.tfstate
-terraform.tfstate.backup
+terraform.tfstate.backup.env
