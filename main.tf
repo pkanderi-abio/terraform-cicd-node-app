@@ -104,11 +104,6 @@ resource "aws_s3_bucket" "my_bucket" {
   }
 }
 
-variable "public_key_source" {
-  description = "Source of the public key (local file or environment variable)"
-  type        = string
-  default     = "local"  # Default for local development
-}
 
 variable "public_key_path" {
   description = "Path to the local public key file"
