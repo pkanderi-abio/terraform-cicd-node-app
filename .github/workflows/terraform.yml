@@ -41,3 +41,12 @@ jobs:
         env:
           TF_VAR_my_ip: ${{ secrets[format('TF_VAR_my_ip_{0}', env.TF_WORKSPACE)] }}
           TF_VAR_db_password: ${{ secrets[format('TF_VAR_db_password_{0}', env.TF_WORKSPACE)] }}
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}  # Add the secret here if needed for a step
+
+      - name: Test SSH Connection
+        run: |
+          echo "$SSH_PUBLIC_KEY" > ./my-key-pair.pub
+          chmod 600 ./my-key-pair.pub
+          ssh -i ./my-key-pair.pub -o StrictHostKeyChecking=no ec2-user@${{ steps.bastion.outputs.public_ip }} "echo Success"
+        env:
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
