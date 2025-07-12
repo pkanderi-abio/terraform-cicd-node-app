@@ -82,13 +82,10 @@ resource "aws_s3_bucket" "my_bucket" {
 }
 
 # Create an SSH Key Pair
+# Remove or comment out this block if importing an existing key
 resource "aws_key_pair" "my_key" {
   key_name   = "my-key-pair"
-  public_key = "~./.ssh/id_rsa.pub" # Ensure this path points to your public key
-  tags = {
-    Name        = "MyKeyPair"
-    Environment = "default"
-  }
+  public_key = file("~/.ssh/my-key-pair.pub")
 }
 
 # Create Security Group
