@@ -34,10 +34,20 @@ jobs:
         run: terraform validate
 
       - name: Load Environment Variables
-        uses: xom9ik/dotenv@v2
-        with:
-          path: ./.env.github
-          mode: replace
+        run: |
+          cat .env.github | while read line; do
+            if [[ $line =~ ^[^#]*= ]]; then
+              export $line
+            fi
+          done
+
+      - name: Debug Environment Variables
+        run: |
+          echo "MY_IP: $TF_VAR_my_ip"
+          echo "DB_PASSWORD: $TF_VAR_db_password"
+          echo "SUBNET_CIDRS: $TF_VAR_subnet_cidrs"
+          echo "AVAILABILITY_ZONES: $TF_VAR_availability_zones"
+          echo "SSH_PUBLIC_KEY: $SSH_PUBLIC_KEY"
 
       - name: Terraform Plan
         run: terraform plan -var "environment=${{ env.TF_WORKSPACE }}" -var "public_key_source=env" -var "ssh_public_key=${{ env.SSH_PUBLIC_KEY }}" -var "db_password=${{ env.TF_VAR_db_password }}" -out=tfplan
@@ -51,11 +61,3 @@ jobs:
           TF_VAR_my_ip: ${{ env.TF_VAR_my_ip }}
           TF_VAR_db_password: ${{ env.TF_VAR_db_password }}
           SSH_PUBLIC_KEY: ${{ env.SSH_PUBLIC_KEY }}
-
-      - name: Debug Secrets
-        run: |
-          echo "MY_IP: $TF_VAR_my_ip"
-          echo "DB_PASSWORD: $TF_VAR_db_password"
-          echo "SUBNET_CIDRS: $TF_VAR_subnet_cidrs"
-          echo "AVAILABILITY_ZONES: $TF_VAR_availability_zones"
-          echo "SSH_PUBLIC_KEY: $SSH_PUBLIC_KEY"
