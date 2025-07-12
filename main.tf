@@ -3,21 +3,20 @@ provider "aws" {
   region = "us-west-2"
 }
 
+
 terraform {
   backend "s3" {
-    bucket       = "my-terraform-state-mg6r2n9o"
-    key          = "terraform.tfstate"
-    region       = "us-west-2"
-#    use_lockfile = true
+    bucket = "my-terraform-state-mg6r2n9o"
+    region = "us-west-2"
   }
 }
 
 # Define Variables
-variable "instance_type" {
-  description = "EC2 instance type"
-  default     = "t2.micro"
+variable "environment" {
+  description = "Environment (default for prod, dev for development)"
+  type        = string
+  default     = "default"
 }
-
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   type        = string
@@ -25,23 +24,32 @@ variable "vpc_cidr" {
 }
 
 variable "my_ip" {
-  description = "Your IP address for SSH access"
+  description = "Your public IP for SSH access"
   type        = string
 }
 
 variable "db_name" {
   description = "Database name"
-  default     = "mydb"
+  type        = string
+  default     = "prod_db"
 }
 
 variable "db_username" {
   description = "Database username"
-  default     = "admin"
+  type        = string
+  default     = "prod_user"
 }
 
 variable "db_password" {
   description = "Database password"
+  type        = string
   sensitive   = true
+}
+
+variable "instance_type" {
+  description = "EC2 instance type"
+  type        = string
+  default     = "t3.medium"
 }
 
 # Generate a random string for unique S3 bucket names
@@ -121,13 +129,14 @@ ingress {
 # Bastion Host
 resource "aws_instance" "bastion" {
   ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = "t2.micro"
+  instance_type          = var.instance_type
   subnet_id              = module.vpc.subnet_ids[0]
   vpc_security_group_ids = [aws_security_group.allow_ssh_http_mysql.id]
-  key_name               = aws_key_pair.my_key.key_name
+  key_name               = "my-key-pair"  # Reuse existing or import
   associate_public_ip_address = true
   tags = {
-    Name = "BastionHost"
+    Name        = "Bastion-${var.environment}"
+    Environment = var.environment
   }
 }
 
@@ -137,8 +146,9 @@ module "autoscaling" {
   instance_type       = var.instance_type
   subnet_ids          = module.vpc.subnet_ids
   security_group_ids  = [aws_security_group.allow_ssh_http_mysql.id]
-  key_name            = aws_key_pair.my_key.key_name
+  key_name            = "my-key-pair"
   target_group_arn    = aws_lb_target_group.web.arn
+  environment         = var.environment
 }
 
 # Load Balancer
@@ -154,7 +164,7 @@ resource "aws_lb" "web" {
 }
 
 resource "aws_lb_target_group" "web" {
-  name     = "web-tg"
+  name     = "web-tg-${var.environment}"
   port     = 3000 # Updated to Node.js port
   protocol = "HTTP"
   vpc_id   = module.vpc.vpc_id

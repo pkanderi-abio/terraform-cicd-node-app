@@ -1,4 +1,4 @@
-terraform.tfvars
+*.tfvars
 # Terraform variables for the VPC module
 .terraform*
 terraform.tfstate

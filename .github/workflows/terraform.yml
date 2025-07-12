@@ -4,11 +4,13 @@ on:
   push:
     branches:
       - main
+      - dev
 
 jobs:
   terraform:
     runs-on: ubuntu-latest
-
+    env:
+      TF_WORKSPACE: ${{ github.ref == 'refs/heads/dev' && 'dev' || 'default' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -26,13 +28,18 @@ jobs:
           aws-region: us-west-2
 
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -backend-config="key=${{ env.TF_WORKSPACE }}/terraform.tfstate"
+        env:
+          TF_WORKSPACE: ${{ github.ref == 'refs/heads/dev' && 'dev' || 'default' }}
 
       - name: Terraform Validate
         run: terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -var "my_ip=${{ secrets.TF_VAR_my_ip }}" -var "db_password=${{ secrets.TF_VAR_db_password }}" -out=tfplan
+        run: terraform plan -var-file=${{ env.TF_WORKSPACE }}.tfvars -out=tfplan
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
+        env:
+          TF_VAR_my_ip: ${{ secrets.TF_VAR_my_ip_${{ env.TF_WORKSPACE }} }}
+          TF_VAR_db_password: ${{ secrets.TF_VAR_db_password_${{ env.TF_WORKSPACE }} }}

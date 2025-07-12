@@ -16,6 +16,12 @@ variable "target_group_arn" {
   description = "ALB target group ARN"
 }
 
+variable "environment" {
+  description = "Environment (default for prod, dev for development)"
+  type        = string
+  default     = "default"
+}
+
 resource "aws_launch_template" "web" {
   name_prefix   = "web-"
   image_id      = data.aws_ami.amazon_linux.id
