@@ -17,11 +17,6 @@ variable "environment" {
   type        = string
   default     = "default"
 }
-variable "vpc_cidr" {
-  description = "CIDR block for the VPC"
-  type        = string
-  default     = "10.0.0.0/16"
-}
 
 variable "my_ip" {
   description = "Your public IP for SSH access"
@@ -46,6 +41,24 @@ variable "db_password" {
   sensitive   = true
 }
 
+variable "vpc_cidr" {
+  description = "CIDR block for the VPC"
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
+variable "subnet_cidrs" {
+  description = "List of subnet CIDR blocks"
+  type        = list(string)
+  default     = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24", "10.0.4.0/24"]
+}
+
+variable "availability_zones" {
+  description = "List of availability zones"
+  type        = list(string)
+  default     = ["us-west-2a", "us-west-2b", "us-west-2c", "us-west-2d"]
+}
+
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
@@ -64,22 +77,18 @@ resource "aws_s3_bucket" "my_bucket" {
   bucket = "my-unique-bucket-name-${random_string.bucket_suffix.result}"
   tags = {
     Name        = "MyBucket"
-    Environment = "Dev"
+    Environment = "default"
   }
 }
 
 # Create an SSH Key Pair
 resource "aws_key_pair" "my_key" {
   key_name   = "my-key-pair"
-  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC91ceSwKNy3fyGycQ8R4aI1InGsHbI0yo/sgdXiMdzX5/F3/h4vdHAjZZ3+f+zyb7zuC/YvBh+0cYqN/bebsJFobtHibcVS8xQYCU9czH3U4aNy3A4akO38dtgwI6TCgkcO/Xd62gwh1mq8wemlItROYjL11xrC9y7VSlSslv/q1d71ViIlrNjW5fK/uVDTPoeH2nrs3ikNGYF7RxyS3iHcrSZKryTyYJZUms3ZN56ZFMC/XnFC7vV7HyPKGsf7/2jcRUK951em1JwLhAMySMA0VXWpUtPVoPF5IPJLV6/4xBDc6T54b3iCXUHLVoHZBSmSfsF79wapmn//kY49uT9 pkanderi@MacBookPro-2115.lan"
-}
-
-# VPC Module
-module "vpc" {
-  source             = "./modules/vpc"
-  vpc_cidr           = var.vpc_cidr
-  subnet_cidrs       = ["10.0.1.0/24", "10.0.2.0/24"]
-  availability_zones = ["us-west-2a", "us-west-2b"]
+  public_key = "~./.ssh/id_rsa.pub" # Ensure this path points to your public key
+  tags = {
+    Name        = "MyKeyPair"
+    Environment = "default"
+  }
 }
 
 # Create Security Group
@@ -140,6 +149,14 @@ resource "aws_instance" "bastion" {
   }
 }
 
+# VPC Module
+module "vpc" {
+  source             = "./modules/vpc"
+  vpc_cidr           = var.vpc_cidr
+  subnet_cidrs       = var.subnet_cidrs
+  availability_zones = var.availability_zones
+}
+
 # Auto-Scaling Module
 module "autoscaling" {
   source              = "./modules/autoscaling"
@@ -150,6 +167,18 @@ module "autoscaling" {
   target_group_arn    = aws_lb_target_group.web.arn
   environment         = var.environment
 }
+
+# RDS Module
+module "rds" {
+  source              = "./modules/rds"
+  vpc_id              = module.vpc.vpc_id
+  subnet_ids          = module.vpc.subnet_ids
+  security_group_ids  = [aws_security_group.allow_ssh_http_mysql.id]
+  db_name             = var.db_name
+  db_username         = var.db_username
+  db_password         = var.db_password
+}
+
 
 # Load Balancer
 resource "aws_lb" "web" {
@@ -189,16 +218,6 @@ resource "aws_lb_listener" "web" {
   }
 }
 
-# RDS Module
-module "rds" {
-  source              = "./modules/rds"
-  vpc_id              = module.vpc.vpc_id
-  subnet_ids          = module.vpc.subnet_ids
-  security_group_ids  = [aws_security_group.allow_ssh_http_mysql.id]
-  db_name             = var.db_name
-  db_username         = var.db_username
-  db_password         = var.db_password
-}
 
 # Data Source
 data "aws_ami" "amazon_linux" {
