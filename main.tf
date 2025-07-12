@@ -8,7 +8,7 @@ terraform {
     bucket       = "my-terraform-state-mg6r2n9o"
     key          = "terraform.tfstate"
     region       = "us-west-2"
-    use_lockfile = true
+#    use_lockfile = true
   }
 }
 
