@@ -81,11 +81,27 @@ resource "aws_s3_bucket" "my_bucket" {
   }
 }
 
-# Create an SSH Key Pair
-# Remove or comment out this block if importing an existing key
+variable "public_key_source" {
+  description = "Source of the public key (local file or environment variable)"
+  type        = string
+  default     = "local"  # Default for local development
+}
+
+variable "public_key_path" {
+  description = "Path to the local public key file"
+  type        = string
+  default     = "./my-key-pair.pub"  # Local file path
+}
+
+# Use a local or environment-based public key
+locals {
+  public_key = var.public_key_source == "local" ? file(var.public_key_path) : (var.public_key_source == "env" ? env("SSH_PUBLIC_KEY") : "")
+}
+
+# Key pair resource using the local value
 resource "aws_key_pair" "my_key" {
   key_name   = "my-key-pair"
-  public_key = file("~/.ssh/my-key-pair.pub")
+  public_key = local.public_key
 }
 
 # Create Security Group
@@ -138,7 +154,7 @@ resource "aws_instance" "bastion" {
   instance_type          = var.instance_type
   subnet_id              = module.vpc.subnet_ids[0]
   vpc_security_group_ids = [aws_security_group.allow_ssh_http_mysql.id]
-  key_name               = "my-key-pair"  # Reuse existing or import
+  key_name               = aws_key_pair.my_key.key_name
   associate_public_ip_address = true
   tags = {
     Name        = "Bastion-${var.environment}"
