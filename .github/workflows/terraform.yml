@@ -56,6 +56,13 @@ jobs:
             echo "INSTANCE_TYPE=${{ secrets.TF_VAR_instance_type_default }}" >> $GITHUB_ENV
           fi
 
+      - name: Debug Secrets
+        run: |
+          echo "MY_IP: ${{ secrets[format('TF_VAR_my_ip_{0}', env.TF_WORKSPACE)] }}"
+          echo "SUBNET_CIDRS: ${{ secrets[format('TF_VAR_subnet_cidrs_{0}', env.TF_WORKSPACE)] }}"
+          echo "AVAILABILITY_ZONES: ${{ secrets[format('TF_VAR_availability_zones_{0}', env.TF_WORKSPACE)] }}"
+          echo "SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}"
+          
       - name: Terraform Plan
         run: terraform plan -var "environment=${{ env.TF_WORKSPACE }}" -var "public_key_source=env" -var "my_ip=${{ env.MY_IP }}" -var "db_name=${{ env.DB_NAME }}" -var "db_username=${{ env.DB_USERNAME }}" -var "db_password=${{ env.DB_PASSWORD }}" -var "vpc_cidr=${{ env.VPC_CIDR }}" -var "subnet_cidrs=${{ env.SUBNET_CIDRS }}" -var "availability_zones=${{ env.AVAILABILITY_ZONES }}" -var "instance_type=${{ env.INSTANCE_TYPE }}" -out=tfplan
         env:
