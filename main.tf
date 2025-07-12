@@ -104,13 +104,6 @@ resource "aws_s3_bucket" "my_bucket" {
   }
 }
 
-
-variable "public_key_path" {
-  description = "Path to the local public key file"
-  type        = string
-  default     = "./my-key-pair.pub"  # Local file path
-}
-
 # Key pair resource using the local value
 resource "aws_key_pair" "my_key" {
   key_name   = "my-key-pair"
