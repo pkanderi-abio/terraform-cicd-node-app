@@ -75,7 +75,11 @@ resource "aws_s3_bucket" "my_bucket" {
 # Create an SSH Key Pair
 resource "aws_key_pair" "my_key" {
   key_name   = "my-key-pair"
-  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC91ceSwKNy3fyGycQ8R4aI1InGsHbI0yo/sgdXiMdzX5/F3/h4vdHAjZZ3+f+zyb7zuC/YvBh+0cYqN/bebsJFobtHibcVS8xQYCU9czH3U4aNy3A4akO38dtgwI6TCgkcO/Xd62gwh1mq8wemlItROYjL11xrC9y7VSlSslv/q1d71ViIlrNjW5fK/uVDTPoeH2nrs3ikNGYF7RxyS3iHcrSZKryTyYJZUms3ZN56ZFMC/XnFC7vV7HyPKGsf7/2jcRUK951em1JwLhAMySMA0VXWpUtPVoPF5IPJLV6/4xBDc6T54b3iCXUHLVoHZBSmSfsF79wapmn//kY49uT9 pkanderi@MacBookPro-2115.lan"
+  public_key = file("~/.ssh/my-key-pair.pub") # Ensure you have your public key here
+  tags = {
+    Name        = "MyKeyPair"
+    Environment = "Dev"
+  }
 }
 
 # VPC Module
