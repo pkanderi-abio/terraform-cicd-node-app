@@ -3,7 +3,6 @@ provider "aws" {
   region = "us-west-2"
 }
 
-
 terraform {
   backend "s3" {
     bucket = "my-terraform-state-mg6r2n9o"
