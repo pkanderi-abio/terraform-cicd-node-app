@@ -3,6 +3,7 @@ provider "aws" {
   region = "us-west-2"
 }
 
+
 terraform {
   backend "s3" {
     bucket = "my-terraform-state-mg6r2n9o"
@@ -61,13 +62,13 @@ variable "vpc_cidr" {
 variable "subnet_cidrs" {
   description = "List of subnet CIDR blocks"
   type        = list(string)
-  default     = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  default     = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24", "10.0.4.0/24"]
 }
 
 variable "availability_zones" {
   description = "List of availability zones"
   type        = list(string)
-  default     = ["us-west-2a", "us-west-2b", "us-west-2c"]
+  default     = ["us-west-2a", "us-west-2b", "us-west-2c", "us-west-2d"]
 }
 
 variable "instance_type" {
