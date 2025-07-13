@@ -44,15 +44,15 @@ jobs:
 
       - name: Prepare Environment Variables
         run: |
-          echo "TF_VAR_my_ip='${{ env.TF_VAR_my_ip_default }}'" >> env_vars
-          echo "TF_VAR_db_name='${{ env.TF_VAR_db_name_default }}'" >> env_vars
-          echo "TF_VAR_db_username='${{ env.TF_VAR_db_username_default }}'" >> env_vars
-          echo "TF_VAR_db_password='${{ env.TF_VAR_db_password_default }}'" >> env_vars
-          echo "TF_VAR_vpc_cidr='${{ env.TF_VAR_vpc_cidr_default }}'" >> env_vars
-          echo "TF_VAR_subnet_cidrs='${{ env.TF_VAR_subnet_cidrs_default }}'" >> env_vars
-          echo "TF_VAR_availability_zones='${{ env.TF_VAR_availability_zones_default }}'" >> env_vars
-          echo "TF_VAR_instance_type='${{ env.TF_VAR_instance_type_default }}'" >> env_vars
-          echo "SSH_PUBLIC_KEY='${{ env.SSH_PUBLIC_KEY }}'" >> env_vars
+          echo "TF_VAR_my_ip='${{ vars.TF_VAR_my_ip_default }}'" >> env_vars
+          echo "TF_VAR_db_name='${{ vars.TF_VAR_db_name_default }}'" >> env_vars
+          echo "TF_VAR_db_username='${{ vars.TF_VAR_db_username_default }}'" >> env_vars
+          echo "TF_VAR_db_password='${{ vars.TF_VAR_db_password_default }}'" >> env_vars
+          echo "TF_VAR_vpc_cidr='${{ vars.TF_VAR_vpc_cidr_default }}'" >> env_vars
+          echo "TF_VAR_subnet_cidrs='${{ vars.TF_VAR_subnet_cidrs_default }}'" >> env_vars
+          echo "TF_VAR_availability_zones='${{ vars.TF_VAR_availability_zones_default }}'" >> env_vars
+          echo "TF_VAR_instance_type='${{ vars.TF_VAR_instance_type_default }}'" >> env_vars
+          echo "SSH_PUBLIC_KEY='${{ vars.SSH_PUBLIC_KEY }}'" >> env_vars
 
       - name: Load Environment Variables
         run: |
