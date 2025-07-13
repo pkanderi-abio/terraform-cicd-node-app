@@ -8,7 +8,7 @@ on:
   workflow_dispatch:  # Allows manual trigger
 
 jobs:
-  deploy:
+  deploy: # Deploy to AWS
     if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     env:
