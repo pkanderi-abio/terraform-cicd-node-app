@@ -63,3 +63,21 @@ jobs:
           MY_IP: $MY_IP
           DB_PASSWORD: $DB_PASSWORD
           SSH_PUBLIC_KEY: $SSH_PUBLIC_KEY
+
+      - name: Terraform destroy
+        run: terraform destroy -auto-approve
+        env:
+          MY_IP: $MY_IP
+          DB_PASSWORD: $DB_PASSWORD
+          SSH_PUBLIC_KEY: $SSH_PUBLIC_KEY
+          
+      - name: Post-apply cleanup
+        run: |
+          echo "Cleaning up temporary files..."
+          rm -f tfplan
+          echo "Cleanup complete."
+        if: always()  # Ensure cleanup runs even if previous steps fail
+        env:
+          MY_IP: $MY_IP
+          DB_PASSWORD: $DB_PASSWORD
+          SSH_PUBLIC_KEY: $SSH_PUBLIC_KEY 
