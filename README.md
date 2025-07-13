@@ -45,3 +45,8 @@ Name: DEV_DB_PASSWORD, Value: my_dev_password
 Name: SSH_PUBLIC_KEY, Value: (paste the full content of my-key-pair.pub, e.g., ssh-rsa AAAAB3N...)
 Name: AWS_ACCESS_KEY_ID, Value: (your AWS key ID)
 Name: AWS_SECRET_ACCESS_KEY, Value: (your AWS secret key)`
+
+
+## How to Run Destroy in Actions
+Go to your repo > "Actions" tab > Select "Terraform CI/CD" > Click "Run workflow" > Choose the branch and run.
+The deploy job skips (since it's workflow_dispatch), and destroy runs.

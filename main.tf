@@ -3,7 +3,6 @@ provider "aws" {
   region = "us-west-2"
 }
 
-
 terraform {
   backend "s3" {
     bucket = "my-terraform-state-mg6r2n9o"
@@ -62,19 +61,25 @@ variable "vpc_cidr" {
 variable "subnet_cidrs" {
   description = "List of subnet CIDR blocks"
   type        = list(string)
-  default     = ["10.0.1.0/24", "10.0.2.0/24"]
+  default     = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24", "10.0.4.0/24"]
 }
 
 variable "availability_zones" {
   description = "List of availability zones"
   type        = list(string)
-  default     = ["us-west-2a", "us-west-2b"]
+  default     = ["us-west-2a", "us-west-2b", "us-west-2c", "us-west-2d"]
 }
 
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
   default     = "t2.micro"
+}
+
+variable "notification_email" {
+  description = "Email for SNS notifications"
+  type        = string
+  default     = "your.email@example.com"  # Replace with your email
 }
 
 locals {
@@ -100,20 +105,20 @@ resource "aws_s3_bucket" "my_bucket" {
   bucket = "my-unique-bucket-name-${random_string.bucket_suffix.result}"
   tags = {
     Name        = "MyBucket"
-    Environment = "efault"
+    Environment = "default"
   }
 }
 
 # Key pair resource using the local value
 resource "aws_key_pair" "my_key" {
   key_name   = "my-key-pair"
-  public_key = file(var.public_key_path)
+  public_key = local.public_key
 }
 
 # Create Security Group
 resource "aws_security_group" "allow_ssh_http_mysql" {
   vpc_id = module.vpc.vpc_id
-ingress {
+  ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -264,3 +269,104 @@ output "db_endpoint" {
 output "bastion_public_ip" {
   value = aws_instance.bastion.public_ip
 }
+
+# SNS Topic for Notifications
+resource "aws_sns_topic" "monitoring_alerts" {
+  name = "monitoring-alerts-${var.environment}"
+}
+
+# SNS Subscription (email)
+resource "aws_sns_topic_subscription" "email_subscription" {
+  topic_arn = aws_sns_topic.monitoring_alerts.arn
+  protocol  = "email"
+  endpoint  = var.notification_email
+}
+
+# CloudWatch Monitoring - High CPU Alarm for Scale Out
+resource "aws_cloudwatch_metric_alarm" "cpu_high" {
+  alarm_name          = "cpu-high-${var.environment}"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = 120
+  statistic           = "Average"
+  threshold           = 80
+  alarm_description   = "This metric monitors EC2 CPU utilization and scales out on high load"
+  alarm_actions       = [aws_autoscaling_policy.scale_out.arn, aws_sns_topic.monitoring_alerts.arn]
+
+  dimensions = {
+    AutoScalingGroupName = module.autoscaling.autoscaling_group_name
+  }
+}
+
+# CloudWatch Monitoring - Low CPU Alarm for Scale In
+resource "aws_cloudwatch_metric_alarm" "cpu_low" {
+  alarm_name          = "cpu-low-${var.environment}"
+  comparison_operator = "LessThanOrEqualToThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = 120
+  statistic           = "Average"
+  threshold           = 20
+  alarm_description   = "This metric monitors EC2 CPU utilization and scales in on low load"
+  alarm_actions       = [aws_autoscaling_policy.scale_in.arn, aws_sns_topic.monitoring_alerts.arn]
+
+  dimensions = {
+    AutoScalingGroupName = module.autoscaling.autoscaling_group_name
+  }
+}
+
+# Scaling Policies
+resource "aws_autoscaling_policy" "scale_out" {
+  name                   = "scale-out-${var.environment}"
+  scaling_adjustment     = 1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 300
+  autoscaling_group_name = module.autoscaling.autoscaling_group_name
+}
+
+resource "aws_autoscaling_policy" "scale_in" {
+  name                   = "scale-in-${var.environment}"
+  scaling_adjustment     = -1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 300
+  autoscaling_group_name = module.autoscaling.autoscaling_group_name
+}
+
+# CloudWatch Monitoring - RDS CPU High Alarm
+resource "aws_cloudwatch_metric_alarm" "rds_cpu_high" {
+  alarm_name          = "rds-cpu-high-${var.environment}"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/RDS"
+  period              = 120
+  statistic           = "Average"
+  threshold           = 80
+  alarm_description   = "This metric monitors RDS CPU utilization"
+  alarm_actions       = [aws_sns_topic.monitoring_alerts.arn]
+
+  dimensions = {
+    DBInstanceIdentifier = module.rds.db_instance_id
+  }
+}
+
+# CloudWatch Monitoring - ALB Unhealthy Hosts Alarm
+resource "aws_cloudwatch_metric_alarm" "alb_unhealthy" {
+  alarm_name          = "alb-unhealthy-${var.environment}"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "UnHealthyHostCount"
+  namespace           = "AWS/ApplicationELB"
+  period              = 60
+  statistic           = "Maximum"
+  threshold           = 0
+  alarm_description   = "This metric monitors unhealthy ALB targets"
+  alarm_actions       = [aws_sns_topic.monitoring_alerts.arn]
+
+  dimensions = {
+    LoadBalancer = aws_lb.web.arn_suffix
+  }
+}  

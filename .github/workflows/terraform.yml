@@ -21,6 +21,7 @@ jobs:
       AVAILABILITY_ZONES: ${{ github.ref == 'refs/heads/dev' && vars.DEV_AVAILABILITY_ZONES || vars.PROD_AVAILABILITY_ZONES }}
       INSTANCE_TYPE: ${{ github.ref == 'refs/heads/dev' && vars.DEV_INSTANCE_TYPE || vars.PROD_INSTANCE_TYPE }}
       DB_PASSWORD: ${{ github.ref == 'refs/heads/dev' && secrets.DEV_DB_PASSWORD || secrets.PROD_DB_PASSWORD }}
+      NOTIFICATION_EMAIL: ${{ github.ref == 'refs/heads/dev' && vars.DEV_NOTIFICATION_EMAIL || vars.PROD_NOTIFICATION_EMAIL }}
       SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
 
     steps:
@@ -54,7 +55,7 @@ jobs:
           echo "SSH_PUBLIC_KEY: $SSH_PUBLIC_KEY"
 
       - name: Terraform Plan
-        run: terraform plan -var "environment=${{ env.TF_WORKSPACE }}" -var "public_key_source=env" -var "ssh_public_key=$SSH_PUBLIC_KEY" -var "my_ip=$MY_IP" -var "db_name=$DB_NAME" -var "db_username=$DB_USERNAME" -var "db_password=$DB_PASSWORD" -var "vpc_cidr=$VPC_CIDR" -var "subnet_cidrs=$SUBNET_CIDRS" -var "availability_zones=$AVAILABILITY_ZONES" -var "instance_type=$INSTANCE_TYPE" -out=tfplan
+        run: terraform plan -var "environment=${{ env.TF_WORKSPACE }}" -var "public_key_source=env" -var "ssh_public_key=$SSH_PUBLIC_KEY" -var "my_ip=$MY_IP" -var "db_name=$DB_NAME" -var "db_username=$DB_USERNAME" -var "db_password=$DB_PASSWORD" -var "vpc_cidr=$VPC_CIDR" -var "subnet_cidrs=$SUBNET_CIDRS" -var "availability_zones=$AVAILABILITY_ZONES" -var "instance_type=$INSTANCE_TYPE" -var "notification_email=$NOTIFICATION_EMAIL" -out=tfplan
         env:
           SSH_PUBLIC_KEY: $SSH_PUBLIC_KEY
           DB_PASSWORD: $DB_PASSWORD
