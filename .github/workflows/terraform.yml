@@ -5,9 +5,11 @@ on:
     branches:
       - main
       - dev
+  workflow_dispatch:  # Allows manual trigger
 
 jobs:
-  terraform:
+  deploy:
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     env:
       TF_WORKSPACE: ${{ github.ref == 'refs/heads/dev' && 'dev' || 'default' }}
@@ -63,13 +65,43 @@ jobs:
           MY_IP: $MY_IP
           DB_PASSWORD: $DB_PASSWORD
           SSH_PUBLIC_KEY: $SSH_PUBLIC_KEY
+    
+  destroy:
+    if: ${{ github.event_name == 'workflow_dispatch' }}  # Manual trigger only
+    runs-on: ubuntu-latest
+    env:
+      TF_WORKSPACE: ${{ github.ref == 'refs/heads/dev' && 'dev' || 'default' }}
+      MY_IP: ${{ github.ref == 'refs/heads/dev' && vars.DEV_MY_IP || vars.PROD_MY_IP }}
+      DB_NAME: ${{ github.ref == 'refs/heads/dev' && vars.DEV_DB_NAME || vars.PROD_DB_NAME }}
+      DB_USERNAME: ${{ github.ref == 'refs/heads/dev' && vars.DEV_DB_USERNAME || vars.PROD_DB_USERNAME }}
+      VPC_CIDR: ${{ github.ref == 'refs/heads/dev' && vars.DEV_VPC_CIDR || vars.PROD_VPC_CIDR }}
+      SUBNET_CIDRS: ${{ github.ref == 'refs/heads/dev' && vars.DEV_SUBNET_CIDRS || vars.PROD_SUBNET_CIDRS }}
+      AVAILABILITY_ZONES: ${{ github.ref == 'refs/heads/dev' && vars.DEV_AVAILABILITY_ZONES || vars.PROD_AVAILABILITY_ZONES }}
+      INSTANCE_TYPE: ${{ github.ref == 'refs/heads/dev' && vars.DEV_INSTANCE_TYPE || vars.PROD_INSTANCE_TYPE }}
+      DB_PASSWORD: ${{ github.ref == 'refs/heads/dev' && secrets.DEV_DB_PASSWORD || secrets.PROD_DB_PASSWORD }}
+      SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
 
-      - name: Terraform destroy
-        run: terraform destroy -auto-approve tfplan
-          
-      - name: Post-apply cleanup
-        run: |
-          echo "Cleaning up temporary files..."
-          rm -f tfplan
-          echo "Cleanup complete."
-        if: always()  # Ensure cleanup runs even if previous steps fail
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Terraform Init
+        run: terraform init -backend-config="key=${{ env.TF_WORKSPACE }}/terraform.tfstate"
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve -var "environment=${{ env.TF_WORKSPACE }}" -var "public_key_source=env" -var "ssh_public_key=$SSH_PUBLIC_KEY" -var "my_ip=$MY_IP" -var "db_name=$DB_NAME" -var "db_username=$DB_USERNAME" -var "db_password=$DB_PASSWORD" -var "vpc_cidr=$VPC_CIDR" -var "subnet_cidrs=$SUBNET_CIDRS" -var "availability_zones=$AVAILABILITY_ZONES" -var "instance_type=$INSTANCE_TYPE"
+        env:
+          SSH_PUBLIC_KEY: $SSH_PUBLIC_KEY
+          DB_PASSWORD: $DB_PASSWORD

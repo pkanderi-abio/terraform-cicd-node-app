@@ -113,3 +113,7 @@ data "aws_ami" "amazon_linux" {
     values = ["amzn2-ami-hvm-*-x86_64-gp2"]
   }
 }
+
+output "autoscaling_group_name" {
+  value = aws_autoscaling_group.web.name
+}
