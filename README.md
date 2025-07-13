@@ -1,6 +1,6 @@
 # terraform-cicd-node-app
 CI/CD Pipeline with GitHub Actions
-
+[![Terraform CI/CD](https://github.com/pkanderi-abio/terraform-cicd-node-app/actions/workflows/terraform.yml/badge.svg)](https://github.com/pkanderi-abio/terraform-cicd-node-app/actions/workflows/terraform.yml)
 
 **Project Overview**
 # CI/CD Pipeline with GitHub Actions:
