@@ -41,7 +41,10 @@ jobs:
 
       - name: Terraform Validate
         run: terraform validate
-
+      - name: Debug Variables
+        run: |
+          echo "MY_IP: $TF_VAR_my_ip_default"
+    
       - name: Prepare Environment Variables
         run: |
           echo "TF_VAR_my_ip='${{ vars.TF_VAR_my_ip_default }}'" >> env_vars
