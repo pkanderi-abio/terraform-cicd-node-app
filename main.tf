@@ -3,6 +3,7 @@ provider "aws" {
   region = "us-west-2"
 }
 
+
 terraform {
   backend "s3" {
     bucket = "my-terraform-state-mg6r2n9o"
@@ -83,7 +84,7 @@ variable "notification_email" {
 }
 
 locals {
-  public_key = var.public_key_source == "local" ? file(var.public_key_path) : (var.public_key_source == "env" ? var.ssh_public_key : "")
+  public_key = var.public_key_source == "local" ? try(file(var.public_key_path), "") : (var.public_key_source == "env" ? var.ssh_public_key : "")
 }
 
 # Add this variable to accept the SSH public key from the environment
@@ -369,4 +370,5 @@ resource "aws_cloudwatch_metric_alarm" "alb_unhealthy" {
   dimensions = {
     LoadBalancer = aws_lb.web.arn_suffix
   }
-}  
+}
+  
