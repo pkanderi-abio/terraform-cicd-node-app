@@ -27,7 +27,7 @@ variable "public_key_path" {
 variable "environment" {
   description = "Environment (e.g., default for Prod)"
   type        = string
-  default     = "default"
+  default     = "Prod"
 }
 
 variable "my_ip" {
@@ -100,7 +100,7 @@ resource "aws_s3_bucket" "my_bucket" {
   bucket = "my-unique-bucket-name-${random_string.bucket_suffix.result}"
   tags = {
     Name        = "MyBucket"
-    Environment = "default"
+    Environment = "Prod"
   }
 }
 

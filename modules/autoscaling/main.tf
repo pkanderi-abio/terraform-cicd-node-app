@@ -19,7 +19,7 @@ variable "target_group_arn" {
 variable "environment" {
   description = "Environment (default for prod, dev for development)"
   type        = string
-  default     = "default"
+  default     = "Prod"
 }
 
 resource "aws_launch_template" "web" {
