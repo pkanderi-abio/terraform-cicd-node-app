@@ -128,26 +128,6 @@ module "vpc" {
   availability_zones = var.availability_zones
 }
 
-# Key pair resource with validation
-resource "aws_key_pair" "my_key" {
-  key_name   = "my-key-pair-${random_string.bucket_suffix.result}"  # Make unique
-  public_key = local.cleaned_key
-  
-  # Add validation
-  lifecycle {
-    precondition {
-      condition     = local.is_valid_key
-      error_message = "The SSH public key must be in valid OpenSSH format (ssh-rsa, ssh-ed25519, etc.)"
-    }
-    create_before_destroy = true
-  }
-  
-  tags = {
-    Name        = "MyKeyPair"
-    Environment = var.environment
-  }
-}
-
 # Create Security Group
 resource "aws_security_group" "allow_ssh_http_mysql" {
   name_prefix = "allow-ssh-http-mysql-"
