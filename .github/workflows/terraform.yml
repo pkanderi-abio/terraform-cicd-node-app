@@ -5,11 +5,20 @@ on:
     branches:
       - main
       - dev
-  workflow_dispatch:  # Allows manual trigger
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
 
 jobs:
-  deploy:
-    if: ${{ github.event_name == 'push' }}
+  terraform:
     runs-on: ubuntu-latest
     env:
       TF_WORKSPACE: ${{ github.ref == 'refs/heads/dev' && 'dev' || 'default' }}
@@ -25,93 +34,114 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.0
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-2
 
-                # Debug step to check the SSH key
-      - name: Debug SSH Key from Secret
+      - name: Validate Environment Variables
         run: |
-          echo "SSH_PUBLIC_KEY length: ${#SSH_PUBLIC_KEY}"
-          echo "SSH_PUBLIC_KEY starts with: ${SSH_PUBLIC_KEY:0:20}"
-          echo "SSH_PUBLIC_KEY ends with: ${SSH_PUBLIC_KEY: -20}"
-        env:
-          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+          echo "🔍 Validating required environment variables..."
+          
+          # Check if required variables are set
+          if [[ -z "$MY_IP" ]]; then
+            echo "❌ MY_IP is not set"
+            exit 1
+          fi
+          
+          if [[ -z "$DB_PASSWORD" ]]; then
+            echo "❌ DB_PASSWORD is not set"
+            exit 1
+          fi
+          
+          if [[ -z "$SSH_PUBLIC_KEY" ]]; then
+            echo "❌ SSH_PUBLIC_KEY is not set"
+            exit 1
+          fi
+          
+          # Validate SSH key format
+          if [[ ! "$SSH_PUBLIC_KEY" =~ ^(ssh-rsa|ssh-dss|ssh-ed25519|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521) ]]; then
+            echo "❌ SSH_PUBLIC_KEY does not appear to be a valid public key"
+            exit 1
+          fi
+          
+          echo "✅ All required variables are set and valid"
+          echo "Environment: $TF_WORKSPACE"
+          echo "SSH key type: $(echo $SSH_PUBLIC_KEY | cut -d' ' -f1)"
+          echo "SSH key length: ${#SSH_PUBLIC_KEY} characters"
 
       - name: Terraform Init
-        run: terraform init -backend-config="key=${{ env.TF_WORKSPACE }}/terraform.tfstate"
+        run: |
+          echo "🚀 Initializing Terraform for workspace: $TF_WORKSPACE"
+          terraform init -backend-config="key=$TF_WORKSPACE/terraform.tfstate"
 
       - name: Terraform Validate
-        run: terraform validate
-
-      - name: Debug Environment Variables
         run: |
-          echo "MY_IP: $MY_IP"
-          echo "DB_PASSWORD: $DB_PASSWORD"
-          echo "SUBNET_CIDRS: $SUBNET_CIDRS"
-          echo "AVAILABILITY_ZONES: $AVAILABILITY_ZONES"
-          echo "SSH_PUBLIC_KEY: $SSH_PUBLIC_KEY"
+          echo "✅ Validating Terraform configuration..."
+          terraform validate
 
       - name: Terraform Plan
-        run: terraform plan -var "environment=${{ env.TF_WORKSPACE }}" -var "public_key_source=env" -var "ssh_public_key=$SSH_PUBLIC_KEY" -var "my_ip=$MY_IP" -var "db_name=$DB_NAME" -var "db_username=$DB_USERNAME" -var "db_password=$DB_PASSWORD" -var "vpc_cidr=$VPC_CIDR" -var "subnet_cidrs=$SUBNET_CIDRS" -var "availability_zones=$AVAILABILITY_ZONES" -var "instance_type=$INSTANCE_TYPE" -out=tfplan
+        id: plan
+        run: |
+          echo "📋 Creating Terraform plan..."
+          terraform plan \
+            -var "environment=$TF_WORKSPACE" \
+            -var "public_key_source=env" \
+            -var "ssh_public_key=$SSH_PUBLIC_KEY" \
+            -var "my_ip=$MY_IP" \
+            -var "db_name=$DB_NAME" \
+            -var "db_username=$DB_USERNAME" \
+            -var "db_password=$DB_PASSWORD" \
+            -var "vpc_cidr=$VPC_CIDR" \
+            -var "subnet_cidrs=$SUBNET_CIDRS" \
+            -var "availability_zones=$AVAILABILITY_ZONES" \
+            -var "instance_type=$INSTANCE_TYPE" \
+            -out=tfplan
         env:
-          SSH_PUBLIC_KEY: $SSH_PUBLIC_KEY
-          DB_PASSWORD: $DB_PASSWORD
+          SSH_PUBLIC_KEY: ${{ env.SSH_PUBLIC_KEY }}
+          DB_PASSWORD: ${{ env.DB_PASSWORD }}
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
-        env:
-          MY_IP: $MY_IP
-          DB_PASSWORD: $DB_PASSWORD
-          SSH_PUBLIC_KEY: $SSH_PUBLIC_KEY
-
-  destroy:
-    if: ${{ github.event_name == 'workflow_dispatch' }}  # Manual trigger only
-    runs-on: ubuntu-latest
-    env:
-      TF_WORKSPACE: ${{ github.ref == 'refs/heads/dev' && 'dev' || 'default' }}
-      MY_IP: ${{ github.ref == 'refs/heads/dev' && vars.DEV_MY_IP || vars.PROD_MY_IP }}
-      DB_NAME: ${{ github.ref == 'refs/heads/dev' && vars.DEV_DB_NAME || vars.PROD_DB_NAME }}
-      DB_USERNAME: ${{ github.ref == 'refs/heads/dev' && vars.DEV_DB_USERNAME || vars.PROD_DB_USERNAME }}
-      VPC_CIDR: ${{ github.ref == 'refs/heads/dev' && vars.DEV_VPC_CIDR || vars.PROD_VPC_CIDR }}
-      SUBNET_CIDRS: ${{ github.ref == 'refs/heads/dev' && vars.DEV_SUBNET_CIDRS || vars.PROD_SUBNET_CIDRS }}
-      AVAILABILITY_ZONES: ${{ github.ref == 'refs/heads/dev' && vars.DEV_AVAILABILITY_ZONES || vars.PROD_AVAILABILITY_ZONES }}
-      INSTANCE_TYPE: ${{ github.ref == 'refs/heads/dev' && vars.DEV_INSTANCE_TYPE || vars.PROD_INSTANCE_TYPE }}
-      DB_PASSWORD: ${{ github.ref == 'refs/heads/dev' && secrets.DEV_DB_PASSWORD || secrets.PROD_DB_PASSWORD }}
-      SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.0
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-west-2
-
-      - name: Terraform Init
-        run: terraform init -backend-config="key=${{ env.TF_WORKSPACE }}/terraform.tfstate"
+        if: |
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'push' && github.ref == 'refs/heads/dev') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+        run: |
+          echo "🚀 Applying Terraform changes..."
+          terraform apply -auto-approve tfplan
 
       - name: Terraform Destroy
-        run: terraform destroy -auto-approve -var "environment=${{ env.TF_WORKSPACE }}" -var "public_key_source=env" -var "ssh_public_key=$SSH_PUBLIC_KEY" -var "my_ip=$MY_IP" -var "db_name=$DB_NAME" -var "db_username=$DB_USERNAME" -var "db_password=$DB_PASSWORD" -var "vpc_cidr=$VPC_CIDR" -var "subnet_cidrs=$SUBNET_CIDRS" -var "availability_zones=$AVAILABILITY_ZONES" -var "instance_type=$INSTANCE_TYPE"
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+        run: |
+          echo "🗑️  Destroying Terraform resources..."
+          echo "⚠️  This will destroy all resources in the $TF_WORKSPACE environment!"
+          terraform destroy -auto-approve \
+            -var "environment=$TF_WORKSPACE" \
+            -var "public_key_source=env" \
+            -var "ssh_public_key=$SSH_PUBLIC_KEY" \
+            -var "my_ip=$MY_IP" \
+            -var "db_name=$DB_NAME" \
+            -var "db_username=$DB_USERNAME" \
+            -var "db_password=$DB_PASSWORD" \
+            -var "vpc_cidr=$VPC_CIDR" \
+            -var "subnet_cidrs=$SUBNET_CIDRS" \
+            -var "availability_zones=$AVAILABILITY_ZONES" \
+            -var "instance_type=$INSTANCE_TYPE"
         env:
-          SSH_PUBLIC_KEY: $SSH_PUBLIC_KEY
-          DB_PASSWORD: $DB_PASSWORD
-          
+          SSH_PUBLIC_KEY: ${{ env.SSH_PUBLIC_KEY }}
+          DB_PASSWORD: ${{ env.DB_PASSWORD }}
+
+      - name: Output Results
+        if: always()
+        run: |
+          echo "📊 Terraform outputs:"
+          terraform output -json || echo "No outputs available"
