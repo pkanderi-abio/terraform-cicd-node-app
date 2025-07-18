@@ -76,15 +76,18 @@ variable "instance_type" {
   default     = "t2.micro"
 }
 
-locals {
-  public_key = var.public_key_source == "local" ? file(var.public_key_path) : (var.public_key_source == "env" ? var.ssh_public_key : "")
-}
-
 # Add this variable to accept the SSH public key from the environment
 variable "ssh_public_key" {
   description = "SSH public key when source is env"
   type        = string
   default     = ""
+}
+
+# Improved local value with validation and formatting
+locals {
+  raw_public_key = var.public_key_source == "local" ? file(var.public_key_path) : (var.public_key_source == "env" ? var.ssh_public_key : "")
+  # Trim whitespace and ensure proper format
+  public_key = trimspace(local.raw_public_key)
 }
 
 # Generate a random string for unique S3 bucket names
@@ -103,71 +106,82 @@ resource "aws_s3_bucket" "my_bucket" {
   }
 }
 
-# Key pair resource using the local value
+# Key pair resource using the local value with validation
 resource "aws_key_pair" "my_key" {
   key_name   = "my-key-pair"
   public_key = local.public_key
+  
+  # Add lifecycle rule to prevent accidental deletion
+  lifecycle {
+    create_before_destroy = true
+  }
+  
+  tags = {
+    Name        = "MyKeyPair"
+    Environment = var.environment
+  }
 }
 
 # Create Security Group
 resource "aws_security_group" "allow_ssh_http_mysql" {
-  vpc_id = module.vpc.vpc_id
+  name_prefix = "allow-ssh-http-mysql-"
+  vpc_id      = module.vpc.vpc_id
+  
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = [var.my_ip] # External access
+    description = "SSH access from your IP"
   }
+  
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = [var.vpc_cidr] # Internal access
+    description = "SSH access from VPC"
   }
+  
   ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTP access"
   }
+  
   ingress {
     from_port   = 3000 # Allow Node.js app port
     to_port     = 3000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "Node.js application port"
   }
+  
   ingress {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
     cidr_blocks = [var.vpc_cidr]
+    description = "MySQL access from VPC"
   }
+  
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "All outbound traffic"
   }
+  
   tags = {
     Name = "AllowSSH_HTTP_MySQL_Node"
-  }
-}
-
-# Bastion Host
-resource "aws_instance" "bastion" {
-  ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = var.instance_type
-  subnet_id              = module.vpc.subnet_ids[0]
-  vpc_security_group_ids = [aws_security_group.allow_ssh_http_mysql.id]
-  key_name               = aws_key_pair.my_key.key_name
-  associate_public_ip_address = true
-  tags = {
-    Name        = "Bastion-${var.environment}"
     Environment = var.environment
   }
 }
 
-# VPC Module
+# VPC Module (moved up to be created first)
 module "vpc" {
   source             = "./modules/vpc"
   vpc_cidr           = var.vpc_cidr
@@ -175,15 +189,87 @@ module "vpc" {
   availability_zones = var.availability_zones
 }
 
-# Auto-Scaling Module
+# Bastion Host
+resource "aws_instance" "bastion" {
+  ami                         = data.aws_ami.amazon_linux.id
+  instance_type               = var.instance_type
+  subnet_id                   = module.vpc.subnet_ids[0]
+  vpc_security_group_ids      = [aws_security_group.allow_ssh_http_mysql.id]
+  key_name                    = aws_key_pair.my_key.key_name
+  associate_public_ip_address = true
+  
+  tags = {
+    Name        = "Bastion-${var.environment}"
+    Environment = var.environment
+  }
+  
+  # Ensure key pair is created first
+  depends_on = [aws_key_pair.my_key]
+}
+
+# Load Balancer Target Group (moved up to be created before autoscaling)
+resource "aws_lb_target_group" "web" {
+  name     = "web-tg-${var.environment}"
+  port     = 3000 # Updated to Node.js port
+  protocol = "HTTP"
+  vpc_id   = module.vpc.vpc_id
+  
+  health_check {
+    path                = "/"
+    protocol            = "HTTP"
+    matcher             = "200"
+    interval            = 30
+    timeout             = 10
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+  
+  tags = {
+    Name        = "WebTargetGroup"
+    Environment = var.environment
+  }
+}
+
+# Load Balancer
+resource "aws_lb" "web" {
+  name               = "web-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.allow_ssh_http_mysql.id]
+  subnets            = module.vpc.subnet_ids
+  
+  tags = {
+    Name        = "WebALB"
+    Environment = var.environment
+  }
+}
+
+resource "aws_lb_listener" "web" {
+  load_balancer_arn = aws_lb.web.arn
+  port              = "3000" # Updated to Node.js port
+  protocol          = "HTTP"
+  
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.web.arn
+  }
+}
+
+# Auto-Scaling Module (with proper dependencies)
 module "autoscaling" {
   source              = "./modules/autoscaling"
   instance_type       = var.instance_type
   subnet_ids          = module.vpc.subnet_ids
   security_group_ids  = [aws_security_group.allow_ssh_http_mysql.id]
-  key_name            = "my-key-pair"
+  key_name            = aws_key_pair.my_key.key_name
   target_group_arn    = aws_lb_target_group.web.arn
   environment         = var.environment
+  
+  # Explicit dependencies to ensure proper creation order
+  depends_on = [
+    aws_key_pair.my_key,
+    aws_lb_target_group.web
+  ]
 }
 
 # RDS Module
@@ -196,46 +282,6 @@ module "rds" {
   db_username         = var.db_username
   db_password         = var.db_password
 }
-
-
-# Load Balancer
-resource "aws_lb" "web" {
-  name               = "web-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.allow_ssh_http_mysql.id]
-  subnets            = module.vpc.subnet_ids
-  tags = {
-    Name = "WebALB"
-  }
-}
-
-resource "aws_lb_target_group" "web" {
-  name     = "web-tg-${var.environment}"
-  port     = 3000 # Updated to Node.js port
-  protocol = "HTTP"
-  vpc_id   = module.vpc.vpc_id
-  health_check {
-    path                = "/"
-    protocol            = "HTTP"
-    matcher             = "200"
-    interval            = 30
-    timeout             = 10
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-  }
-}
-
-resource "aws_lb_listener" "web" {
-  load_balancer_arn = aws_lb.web.arn
-  port              = 3000 # Updated to Node.js port
-  protocol          = "HTTP"
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.web.arn
-  }
-}
-
 
 # Data Source
 data "aws_ami" "amazon_linux" {
@@ -262,4 +308,12 @@ output "db_endpoint" {
 
 output "bastion_public_ip" {
   value = aws_instance.bastion.public_ip
+}
+
+output "key_pair_name" {
+  value = aws_key_pair.my_key.key_name
+}
+
+output "vpc_id" {
+  value = module.vpc.vpc_id
 }
