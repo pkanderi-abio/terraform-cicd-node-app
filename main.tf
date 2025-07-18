@@ -83,11 +83,25 @@ variable "ssh_public_key" {
   default     = ""
 }
 
-# Improved local value with validation and formatting
+# Enhanced local value with better error handling and debugging
 locals {
   raw_public_key = var.public_key_source == "local" ? file(var.public_key_path) : (var.public_key_source == "env" ? var.ssh_public_key : "")
-  # Trim whitespace and ensure proper format
-  public_key = trimspace(local.raw_public_key)
+  # Clean the key: trim whitespace, remove any extra newlines
+  cleaned_key = replace(trimspace(local.raw_public_key), "\n", "")
+  # Validate key format
+  is_valid_key = can(regex("^(ssh-rsa|ssh-dss|ssh-ed25519|ecdsa-sha2-nistp256|ecdsa-sha2-nistp384|ecdsa-sha2-nistp521) [A-Za-z0-9+/]+=*", local.cleaned_key))
+}
+
+# Debug output to help troubleshoot
+output "debug_key_info" {
+  value = {
+    key_source     = var.public_key_source
+    key_path       = var.public_key_path
+    key_length     = length(local.cleaned_key)
+    key_starts_with = substr(local.cleaned_key, 0, min(20, length(local.cleaned_key)))
+    is_valid       = local.is_valid_key
+  }
+  sensitive = false
 }
 
 # Generate a random string for unique S3 bucket names
@@ -106,13 +120,25 @@ resource "aws_s3_bucket" "my_bucket" {
   }
 }
 
-# Key pair resource using the local value with validation
+# VPC Module (moved up to be created first)
+module "vpc" {
+  source             = "./modules/vpc"
+  vpc_cidr           = var.vpc_cidr
+  subnet_cidrs       = var.subnet_cidrs
+  availability_zones = var.availability_zones
+}
+
+# Key pair resource with validation
 resource "aws_key_pair" "my_key" {
-  key_name   = "my-key-pair"
-  public_key = local.public_key
+  key_name   = "my-key-pair-${random_string.bucket_suffix.result}"  # Make unique
+  public_key = local.cleaned_key
   
-  # Add lifecycle rule to prevent accidental deletion
+  # Add validation
   lifecycle {
+    precondition {
+      condition     = local.is_valid_key
+      error_message = "The SSH public key must be in valid OpenSSH format (ssh-rsa, ssh-ed25519, etc.)"
+    }
     create_before_destroy = true
   }
   
@@ -179,14 +205,6 @@ resource "aws_security_group" "allow_ssh_http_mysql" {
     Name = "AllowSSH_HTTP_MySQL_Node"
     Environment = var.environment
   }
-}
-
-# VPC Module (moved up to be created first)
-module "vpc" {
-  source             = "./modules/vpc"
-  vpc_cidr           = var.vpc_cidr
-  subnet_cidrs       = var.subnet_cidrs
-  availability_zones = var.availability_zones
 }
 
 # Bastion Host
