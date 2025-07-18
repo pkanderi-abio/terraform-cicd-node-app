@@ -39,6 +39,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-2
 
+                # Debug step to check the SSH key
+      - name: Debug SSH Key from Secret
+        run: |
+          echo "SSH_PUBLIC_KEY length: ${#SSH_PUBLIC_KEY}"
+          echo "SSH_PUBLIC_KEY starts with: ${SSH_PUBLIC_KEY:0:20}"
+          echo "SSH_PUBLIC_KEY ends with: ${SSH_PUBLIC_KEY: -20}"
+        env:
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+
       - name: Terraform Init
         run: terraform init -backend-config="key=${{ env.TF_WORKSPACE }}/terraform.tfstate"
 
