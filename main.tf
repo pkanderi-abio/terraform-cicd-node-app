@@ -128,6 +128,17 @@ module "vpc" {
   availability_zones = var.availability_zones
 }
 
+# Key pair resource
+resource "aws_key_pair" "my_key" {
+  key_name   = "my-key-pair-${random_string.bucket_suffix.result}"  # Make unique
+  public_key = local.cleaned_key
+
+  tags = {
+    Name        = "MyKeyPair"
+    Environment = var.environment
+  }
+}
+
 # Create Security Group
 resource "aws_security_group" "allow_ssh_http_mysql" {
   name_prefix = "allow-ssh-http-mysql-"
